@@ -1,11 +1,9 @@
 <template>
-  <div class="rounded-2xl overflow-hidden border-2 border-coral-100 shadow-lg map-wrapper">
-    <div ref="mapContainer" class="w-full h-full"></div>
-  </div>
+  <div ref="mapContainer" class="map-leaflet rounded-2xl overflow-hidden border-2 border-coral-100 shadow-lg"></div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import L from 'leaflet'
 
 const props = defineProps({
@@ -19,8 +17,10 @@ const props = defineProps({
 const mapContainer = ref(null)
 let map = null
 
-onMounted(() => {
+onMounted(async () => {
+  await nextTick()
   if (!mapContainer.value) return
+
   map = L.map(mapContainer.value, {
     center: [props.lat || 36.67, props.lng || 117.0],
     zoom: props.markers.length > 0 ? 10 : 14,
@@ -54,13 +54,15 @@ onMounted(() => {
     }
   }
 
-  // 修复手机端地图空白：延迟触发 invalidateSize
-  setTimeout(() => {
-    if (map) map.invalidateSize()
-  }, 200)
+  // 多阶段触发 invalidateSize：覆盖异步布局和图片加载延迟
+  ;[100, 300, 600].forEach(delay => {
+    setTimeout(() => {
+      if (map) map.invalidateSize()
+    }, delay)
+  })
 
-  // 监听窗口尺寸变化（横竖屏切换等）
   window.addEventListener('resize', handleResize)
+  window.addEventListener('orientationchange', handleOrientation)
 })
 
 watch(() => [props.lat, props.lng], () => {
@@ -74,8 +76,15 @@ function handleResize() {
   if (map) map.invalidateSize()
 }
 
+function handleOrientation() {
+  setTimeout(() => {
+    if (map) map.invalidateSize()
+  }, 300)
+}
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('orientationchange', handleOrientation)
   if (map) {
     map.remove()
     map = null
@@ -84,11 +93,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.map-wrapper {
+.map-leaflet {
   height: 250px;
+  width: 100%;
 }
 @media (min-width: 768px) {
-  .map-wrapper {
+  .map-leaflet {
     height: 350px;
   }
 }
