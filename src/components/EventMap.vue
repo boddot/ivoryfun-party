@@ -1,11 +1,11 @@
 <template>
-  <div class="rounded-2xl overflow-hidden border-2 border-coral-100 shadow-lg" style="height: 350px;">
+  <div class="rounded-2xl overflow-hidden border-2 border-coral-100 shadow-lg map-wrapper">
     <div ref="mapContainer" class="w-full h-full"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import L from 'leaflet'
 
 const props = defineProps({
@@ -53,6 +53,14 @@ onMounted(() => {
       map.fitBounds(group, { padding: [40, 40] })
     }
   }
+
+  // 修复手机端地图空白：延迟触发 invalidateSize
+  setTimeout(() => {
+    if (map) map.invalidateSize()
+  }, 200)
+
+  // 监听窗口尺寸变化（横竖屏切换等）
+  window.addEventListener('resize', handleResize)
 })
 
 watch(() => [props.lat, props.lng], () => {
@@ -61,4 +69,27 @@ watch(() => [props.lat, props.lng], () => {
     L.marker([props.lat, props.lng]).addTo(map).bindPopup(`<b>${props.title}</b>`)
   }
 })
+
+function handleResize() {
+  if (map) map.invalidateSize()
+}
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  if (map) {
+    map.remove()
+    map = null
+  }
+})
 </script>
+
+<style scoped>
+.map-wrapper {
+  height: 250px;
+}
+@media (min-width: 768px) {
+  .map-wrapper {
+    height: 350px;
+  }
+}
+</style>
